@@ -92,8 +92,19 @@ def get_user_goal():
         goal = " ".join(sys.argv[1:]).strip()
         print(f"Goal: {goal}")
     else:
-        goal = "Create a comprehensive FAQ for Cyanview CI0"
-        print(f"Default goal: {goal}")
+        print("Please describe what you want the AI crew to accomplish:")
+        print("(e.g., 'Create a marketing strategy for a new product', 'Write a technical documentation', etc.)")
+        print("")
+        try:
+            while True:
+                goal = input("Your request: ").strip()
+                if goal:
+                    break
+                print("❌ Please provide a valid request. This field is required.")
+                print("")
+        except (EOFError, KeyboardInterrupt):
+            print("\n❌ Operation cancelled by user.")
+            sys.exit(0)
     
     print("🔍 Agent 1 will research this goal and design the optimal crew...")
     return goal
