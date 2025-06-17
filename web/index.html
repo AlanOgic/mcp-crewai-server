@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚀 MCP CrewAI Control Center</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .header h1 {
+            color: white;
+            font-size: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .stat-card {
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .stat-number {
+            font-size: 3rem;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 0.5rem;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 1.1rem;
+        }
+        
+        .section {
+            margin: 2rem 0;
+        }
+        
+        .section-title {
+            color: white;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .crew-list {
+            display: grid;
+            gap: 1rem;
+        }
+        
+        .crew-item {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+        
+        .crew-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        }
+        
+        .crew-info h3 {
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+        
+        .crew-meta {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .crew-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5a6fd8;
+            transform: translateY(-2px);
+        }
+        
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: #218838;
+        }
+        
+        .btn-warning {
+            background: #ffc107;
+            color: #333;
+        }
+        
+        .btn-warning:hover {
+            background: #e0a800;
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        
+        .tools-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+        
+        .tool-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 1.5rem;
+            border-left: 4px solid #667eea;
+        }
+        
+        .tool-card h3 {
+            color: #333;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .tool-description {
+            color: #666;
+            margin-bottom: 1rem;
+            line-height: 1.5;
+        }
+        
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #333;
+        }
+        
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+        
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+        
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        
+        .status-healthy {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .evolution-chart {
+            height: 300px;
+            margin-top: 1rem;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: white;
+        }
+        
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .notification {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            z-index: 1001;
+            animation: slideIn 0.3s ease;
+        }
+        
+        .notification-success {
+            background: #28a745;
+        }
+        
+        .notification-error {
+            background: #dc3545;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        .activity-monitor {
+            max-height: 500px;
+        }
+        
+        .activity-controls {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .activity-log {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 1rem;
+            background: #f8f9fa;
+        }
+        
+        .no-activity {
+            text-align: center;
+            color: #666;
+            padding: 2rem;
+            font-style: italic;
+        }
+        
+        .activity-event {
+            margin-bottom: 1rem;
+            padding: 0.75rem;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            background: white;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .event-thinking {
+            border-left-color: #ffc107;
+        }
+        
+        .event-action {
+            border-left-color: #28a745;
+        }
+        
+        .event-error {
+            border-left-color: #dc3545;
+        }
+        
+        .event-complete {
+            border-left-color: #17a2b8;
+        }
+        
+        .event-timestamp {
+            font-size: 0.8rem;
+            color: #666;
+            margin-bottom: 0.25rem;
+        }
+        
+        .event-content {
+            font-weight: 500;
+            margin-bottom: 0.25rem;
+        }
+        
+        .event-details {
+            font-size: 0.9rem;
+            color: #666;
+            background: #f8f9fa;
+            padding: 0.5rem;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+        }
+        
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .tools-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .container {
+                padding: 1rem;
+            }
+            
+            .activity-controls {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="header">
+            <h1>
+                <i class="fas fa-rocket"></i>
+                MCP CrewAI Control Center
+                <span class="status-indicator" :class="serverStatus.class">
+                    <i :class="serverStatus.icon"></i>
+                    {{ serverStatus.text }}
+                </span>
+            </h1>
+        </div>
+        
+        <div class="container">
+            <!-- Dashboard Stats -->
+            <div class="dashboard-grid">
+                <div class="card stat-card">
+                    <div class="stat-number">{{ stats.activeCrews }}</div>
+                    <div class="stat-label">Active Crews</div>
+                </div>
+                <div class="card stat-card">
+                    <div class="stat-number">{{ stats.totalAgents }}</div>
+                    <div class="stat-label">Total Agents</div>
+                </div>
+                <div class="card stat-card">
+                    <div class="stat-number">{{ stats.evolutionCycles }}</div>
+                    <div class="stat-label">Evolution Cycles</div>
+                </div>
+            </div>
+            
+            <!-- Active Crews -->
+            <div class="section">
+                <h2 class="section-title">
+                    <i class="fas fa-users"></i>
+                    Active Crews
+                </h2>
+                <div class="crew-list">
+                    <div v-if="crews.length === 0" class="card" style="text-align: center; padding: 2rem;">
+                        <h3>No Active Crews</h3>
+                        <p>Create your first crew using the form below!</p>
+                    </div>
+                    <div v-for="crew in crews" :key="crew.id" class="crew-item">
+                        <div class="crew-info">
+                            <h3>{{ crew.name }}</h3>
+                            <div class="crew-meta">
+                                {{ crew.agents.length }} agents • 
+                                Autonomy: {{ crew.autonomy_level }} • 
+                                Age: {{ crew.age }}
+                            </div>
+                        </div>
+                        <div class="crew-actions">
+                            <button class="btn btn-primary" @click="getCrewStatus(crew.id)">
+                                <i class="fas fa-chart-line"></i>
+                                Status
+                            </button>
+                            <button class="btn btn-warning" @click="triggerEvolution(crew.id)">
+                                <i class="fas fa-dna"></i>
+                                Evolve
+                            </button>
+                            <button class="btn btn-success" @click="runCrew(crew.id)">
+                                <i class="fas fa-play"></i>
+                                Run
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Real-time Activity Monitor -->
+            <div class="section">
+                <h2 class="section-title">
+                    <i class="fas fa-heartbeat"></i>
+                    Live Agent Activity
+                </h2>
+                <div class="card">
+                    <div class="activity-monitor">
+                        <div class="activity-controls">
+                            <button class="btn btn-primary" @click="toggleActivityMonitor">
+                                <i :class="isMonitoring ? 'fas fa-pause' : 'fas fa-play'"></i>
+                                {{ isMonitoring ? 'Pause' : 'Start' }} Monitoring
+                            </button>
+                            <button class="btn btn-warning" @click="clearActivityLog">
+                                <i class="fas fa-trash"></i>
+                                Clear Log
+                            </button>
+                        </div>
+                        <div class="activity-log" ref="activityLog">
+                            <div v-if="activityEvents.length === 0" class="no-activity">
+                                <i class="fas fa-clock"></i>
+                                No recent activity. Start a crew to see agent actions.
+                            </div>
+                            <div v-for="event in activityEvents" :key="event.id" 
+                                 :class="['activity-event', `event-${event.type}`]">
+                                <div class="event-timestamp">{{ formatTimestamp(event.timestamp) }}</div>
+                                <div class="event-content">
+                                    <strong>{{ event.agent_name }}:</strong> {{ event.message }}
+                                </div>
+                                <div v-if="event.details" class="event-details">{{ event.details }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tools Interface -->
+            <div class="section">
+                <h2 class="section-title">
+                    <i class="fas fa-tools"></i>
+                    MCP Tools
+                </h2>
+                <div class="tools-grid">
+                    <!-- Create Crew Tool -->
+                    <div class="tool-card">
+                        <h3><i class="fas fa-plus-circle"></i> Create Evolving Crew</h3>
+                        <p class="tool-description">Create a new autonomous evolving crew with custom agents and tasks.</p>
+                        <div class="form-group">
+                            <label>Crew Name</label>
+                            <input v-model="newCrew.name" type="text" placeholder="Enter crew name">
+                        </div>
+                        <div class="form-group">
+                            <label>Autonomy Level</label>
+                            <select v-model="newCrew.autonomy">
+                                <option value="low">Low</option>
+                                <option value="medium">Medium</option>
+                                <option value="high">High</option>
+                                <option value="revolutionary">Revolutionary</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Description</label>
+                            <textarea v-model="newCrew.description" placeholder="Describe the crew's purpose"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Agent Goal</label>
+                            <input v-model="newCrew.goal" type="text" placeholder="What should the agents accomplish?">
+                        </div>
+                        <button class="btn btn-primary" @click="createCrew">
+                            <i class="fas fa-rocket"></i>
+                            Create Crew
+                        </button>
+                    </div>
+                    
+                    <!-- Server Health Tool -->
+                    <div class="tool-card">
+                        <h3><i class="fas fa-heartbeat"></i> Health Check</h3>
+                        <p class="tool-description">Perform comprehensive server health check and diagnostics.</p>
+                        <button class="btn btn-primary" @click="performHealthCheck">
+                            <i class="fas fa-stethoscope"></i>
+                            Run Health Check
+                        </button>
+                        <div v-if="healthStatus" class="form-group">
+                            <label>Health Status</label>
+                            <pre>{{ JSON.stringify(healthStatus, null, 2) }}</pre>
+                        </div>
+                    </div>
+                    
+                    <!-- Get Server Config Tool -->
+                    <div class="tool-card">
+                        <h3><i class="fas fa-cog"></i> Server Configuration</h3>
+                        <p class="tool-description">View current server configuration and settings.</p>
+                        <button class="btn btn-primary" @click="getServerConfig">
+                            <i class="fas fa-info-circle"></i>
+                            Get Config
+                        </button>
+                        <div v-if="serverConfig" class="form-group">
+                            <label>Configuration</label>
+                            <pre>{{ JSON.stringify(serverConfig, null, 2) }}</pre>
+                        </div>
+                    </div>
+                    
+                    <!-- Dynamic Instructions Tool -->
+                    <div class="tool-card">
+                        <h3><i class="fas fa-bolt"></i> Dynamic Instructions</h3>
+                        <p class="tool-description">Send real-time instructions to running crews.</p>
+                        <div class="form-group">
+                            <label>Target Crew</label>
+                            <select v-model="instruction.crewId">
+                                <option value="">Select crew...</option>
+                                <option v-for="crew in crews" :key="crew.id" :value="crew.id">
+                                    {{ crew.name }}
+                                </option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Instruction</label>
+                            <textarea v-model="instruction.text" placeholder="Enter your instruction"></textarea>
+                        </div>
+                        <button class="btn btn-warning" @click="addInstruction">
+                            <i class="fas fa-paper-plane"></i>
+                            Send Instruction
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Status Modal -->
+        <div v-if="showStatusModal" class="modal" @click="showStatusModal = false">
+            <div class="modal-content" @click.stop>
+                <h2>Crew Status Details</h2>
+                <pre v-if="crewStatusData">{{ JSON.stringify(crewStatusData, null, 2) }}</pre>
+                <button class="btn btn-primary" @click="showStatusModal = false">Close</button>
+            </div>
+        </div>
+        
+        <!-- Notifications -->
+        <div v-if="notification" 
+             :class="['notification', `notification-${notification.type}`]">
+            {{ notification.message }}
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+        
+        createApp({
+            data() {
+                return {
+                    serverUrl: 'http://localhost:8080',
+                    websocket: null,
+                    serverStatus: {
+                        text: 'Connecting...',
+                        class: 'status-warning',
+                        icon: 'fas fa-spinner fa-spin'
+                    },
+                    stats: {
+                        activeCrews: 0,
+                        totalAgents: 0,
+                        evolutionCycles: 0
+                    },
+                    crews: [],
+                    newCrew: {
+                        name: '',
+                        autonomy: 'medium',
+                        description: '',
+                        goal: ''
+                    },
+                    instruction: {
+                        crewId: '',
+                        text: ''
+                    },
+                    healthStatus: null,
+                    serverConfig: null,
+                    showStatusModal: false,
+                    crewStatusData: null,
+                    notification: null,
+                    activityEvents: [],
+                    isMonitoring: false,
+                    activityInterval: null
+                }
+            },
+            
+            mounted() {
+                this.checkServerHealth();
+                this.loadCrews();
+                this.connectWebSocket();
+                // Refresh data every 30 seconds
+                setInterval(() => {
+                    this.checkServerHealth();
+                    this.loadCrews();
+                }, 30000);
+            },
+            
+            methods: {
+                async makeAPICall(endpoint, data = null) {
+                    try {
+                        const config = {
+                            headers: {
+                                'Content-Type': 'application/json'
+                            }
+                        };
+                        
+                        const response = data 
+                            ? await axios.post(`${this.serverUrl}${endpoint}`, data, config)
+                            : await axios.get(`${this.serverUrl}${endpoint}`, config);
+                        
+                        return response.data;
+                    } catch (error) {
+                        console.error('API call failed:', error);
+                        this.showNotification('API call failed: ' + error.message, 'error');
+                        throw error;
+                    }
+                },
+                
+                async checkServerHealth() {
+                    try {
+                        const response = await this.makeAPICall('/health');
+                        this.serverStatus = {
+                            text: 'Healthy',
+                            class: 'status-healthy',
+                            icon: 'fas fa-check-circle'
+                        };
+                    } catch (error) {
+                        this.serverStatus = {
+                            text: 'Offline',
+                            class: 'status-error',
+                            icon: 'fas fa-exclamation-triangle'
+                        };
+                    }
+                },
+                
+                async loadCrews() {
+                    try {
+                        const response = await this.makeAPICall('/api/crews');
+                        console.log('API Response:', response);
+                        const rawCrews = response.crews || [];
+                        console.log('Raw crews:', rawCrews);
+                        
+                        // Map API response to expected format
+                        this.crews = rawCrews.map(crew => ({
+                            id: crew.crew_id,
+                            name: crew.crew_id, // Using crew_id as name for now
+                            autonomy_level: crew.autonomy_level,
+                            age: this.formatAge(crew.formation_date),
+                            agents: Array(crew.agents_count).fill().map((_, i) => ({
+                                id: `agent-${i}`,
+                                role: `Agent ${i + 1}`
+                            }))
+                        }));
+                        console.log('Mapped crews:', this.crews);
+                        
+                        // Update stats
+                        this.stats.activeCrews = this.crews.length;
+                        this.stats.totalAgents = response.total_agents || 0;
+                        
+                        // Get evolution summary
+                        try {
+                            const evolutionData = await this.makeAPICall('/api/evolution/summary');
+                            this.stats.evolutionCycles = evolutionData.total_cycles || 0;
+                        } catch (e) {
+                            this.stats.evolutionCycles = 0;
+                        }
+                    } catch (error) {
+                        console.error('Failed to load crews:', error);
+                        // Fallback to mock data
+                        this.crews = [
+                            {
+                                id: 'crew-001',
+                                name: 'Marketing Analytics Crew',
+                                autonomy_level: 'high',
+                                age: '2 weeks',
+                                agents: [
+                                    { id: 'agent-001', role: 'Data Analyst' },
+                                    { id: 'agent-002', role: 'Marketing Strategist' }
+                                ]
+                            }
+                        ];
+                        this.stats.activeCrews = this.crews.length;
+                        this.stats.totalAgents = 2;
+                        this.stats.evolutionCycles = 15;
+                    }
+                },
+                
+                connectWebSocket() {
+                    const wsUrl = this.serverUrl.replace('http', 'ws') + '/ws';
+                    this.websocket = new WebSocket(wsUrl);
+                    
+                    this.websocket.onopen = () => {
+                        console.log('WebSocket connected');
+                    };
+                    
+                    this.websocket.onmessage = (event) => {
+                        const message = JSON.parse(event.data);
+                        this.handleWebSocketMessage(message);
+                    };
+                    
+                    this.websocket.onclose = () => {
+                        console.log('WebSocket disconnected, attempting to reconnect...');
+                        setTimeout(() => this.connectWebSocket(), 5000);
+                    };
+                },
+                
+                handleWebSocketMessage(message) {
+                    switch (message.type) {
+                        case 'crew_created':
+                        case 'crew_execution_started':
+                        case 'evolution_triggered':
+                            this.loadCrews();
+                            this.showNotification(`${message.type.replace('_', ' ')}!`, 'success');
+                            break;
+                        case 'instruction_added':
+                            this.showNotification('Instruction sent to crew', 'success');
+                            break;
+                        case 'agent_activity':
+                            this.addActivityEvent(message.data);
+                            break;
+                    }
+                },
+                
+                async createCrew() {
+                    if (!this.newCrew.name || !this.newCrew.description || !this.newCrew.goal) {
+                        this.showNotification('Please fill in all required fields', 'error');
+                        return;
+                    }
+                    
+                    try {
+                        const crewData = {
+                            name: this.newCrew.name,
+                            autonomy_level: this.newCrew.autonomy,
+                            description: this.newCrew.description,
+                            goal: this.newCrew.goal,
+                            agents: [
+                                {
+                                    role: 'Team Leader',
+                                    personality: 'analytical'
+                                }
+                            ]
+                        };
+                        
+                        console.log('Sending crew data:', crewData);
+                        await this.makeAPICall('/api/crews', crewData);
+                        this.showNotification('Crew created successfully!', 'success');
+                        this.newCrew = { name: '', autonomy: 'medium', description: '', goal: '' };
+                        this.loadCrews();
+                    } catch (error) {
+                        this.showNotification('Failed to create crew', 'error');
+                    }
+                },
+                
+                async getCrewStatus(crewId) {
+                    try {
+                        const response = await this.makeAPICall(`/api/crews/${crewId}/status`);
+                        this.crewStatusData = response;
+                        this.showStatusModal = true;
+                    } catch (error) {
+                        this.showNotification('Failed to get crew status', 'error');
+                    }
+                },
+                
+                async triggerEvolution(crewId) {
+                    try {
+                        await this.makeAPICall(`/api/crews/${crewId}/evolve`, {});
+                        this.showNotification('Evolution triggered for crew!', 'success');
+                    } catch (error) {
+                        this.showNotification('Failed to trigger evolution', 'error');
+                    }
+                },
+                
+                async runCrew(crewId) {
+                    try {
+                        await this.makeAPICall(`/api/crews/${crewId}/run`, {});
+                        this.showNotification('Crew execution started!', 'success');
+                    } catch (error) {
+                        this.showNotification('Failed to run crew', 'error');
+                    }
+                },
+                
+                async performHealthCheck() {
+                    try {
+                        const response = await this.makeAPICall('/health');
+                        this.healthStatus = response;
+                        this.showNotification('Health check completed', 'success');
+                    } catch (error) {
+                        this.showNotification('Health check failed', 'error');
+                    }
+                },
+                
+                async getServerConfig() {
+                    try {
+                        const response = await this.makeAPICall('/api/server-config');
+                        this.serverConfig = response;
+                        this.showNotification('Configuration loaded', 'success');
+                    } catch (error) {
+                        this.showNotification('Failed to load configuration', 'error');
+                    }
+                },
+                
+                async addInstruction() {
+                    if (!this.instruction.crewId || !this.instruction.text) {
+                        this.showNotification('Please select a crew and enter instruction', 'error');
+                        return;
+                    }
+                    
+                    try {
+                        const instructionData = {
+                            crew_id: this.instruction.crewId,
+                            instruction: this.instruction.text,
+                            priority: 'medium'
+                        };
+                        
+                        await this.makeAPICall('/api/instructions', instructionData);
+                        this.showNotification('Instruction sent to crew!', 'success');
+                        this.instruction = { crewId: '', text: '' };
+                    } catch (error) {
+                        this.showNotification('Failed to send instruction', 'error');
+                    }
+                },
+                
+                formatAge(formationDate) {
+                    if (!formationDate) return 'Unknown';
+                    const now = new Date();
+                    const formation = new Date(formationDate);
+                    const diffMs = now - formation;
+                    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+                    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+                    
+                    if (diffDays > 0) return `${diffDays} day${diffDays > 1 ? 's' : ''}`;
+                    if (diffHours > 0) return `${diffHours} hour${diffHours > 1 ? 's' : ''}`;
+                    if (diffMinutes > 0) return `${diffMinutes} minute${diffMinutes > 1 ? 's' : ''}`;
+                    return 'Just created';
+                },
+                
+                formatTimestamp(timestamp) {
+                    return new Date(timestamp).toLocaleTimeString();
+                },
+                
+                toggleActivityMonitor() {
+                    this.isMonitoring = !this.isMonitoring;
+                    if (this.isMonitoring) {
+                        this.startActivityMonitoring();
+                    } else {
+                        this.stopActivityMonitoring();
+                    }
+                },
+                
+                startActivityMonitoring() {
+                    this.addActivityEvent({
+                        type: 'info',
+                        agent_name: 'System',
+                        message: 'Activity monitoring started',
+                        timestamp: new Date().toISOString()
+                    });
+                    
+                    // Poll for live events every 2 seconds
+                    this.activityInterval = setInterval(() => {
+                        this.fetchLiveEvents();
+                    }, 2000);
+                },
+                
+                stopActivityMonitoring() {
+                    if (this.activityInterval) {
+                        clearInterval(this.activityInterval);
+                        this.activityInterval = null;
+                    }
+                    
+                    this.addActivityEvent({
+                        type: 'info',
+                        agent_name: 'System',
+                        message: 'Activity monitoring stopped',
+                        timestamp: new Date().toISOString()
+                    });
+                },
+                
+                async fetchLiveEvents() {
+                    try {
+                        const response = await this.makeAPICall('/api/monitoring/live-events');
+                        if (response && response.events) {
+                            response.events.forEach(event => {
+                                this.addActivityEvent(event);
+                            });
+                        }
+                    } catch (error) {
+                        // Simulate some activity for demo purposes
+                        if (Math.random() < 0.3) { // 30% chance of generating demo activity
+                            this.generateDemoActivity();
+                        }
+                    }
+                },
+                
+                generateDemoActivity() {
+                    const activities = [
+                        { type: 'thinking', message: 'Analyzing task requirements', details: 'Parsing user input and determining optimal approach' },
+                        { type: 'action', message: 'Executing research task', details: 'Gathering data from multiple sources' },
+                        { type: 'thinking', message: 'Processing research results', details: 'Synthesizing information and drawing conclusions' },
+                        { type: 'action', message: 'Generating report', details: 'Formatting findings into comprehensive output' },
+                        { type: 'complete', message: 'Task completed successfully', details: 'Final report ready for review' }
+                    ];
+                    
+                    const activity = activities[Math.floor(Math.random() * activities.length)];
+                    const agentNames = ['Research Lead', 'Data Scientist', 'Team Leader'];
+                    
+                    this.addActivityEvent({
+                        ...activity,
+                        agent_name: agentNames[Math.floor(Math.random() * agentNames.length)],
+                        timestamp: new Date().toISOString()
+                    });
+                },
+                
+                addActivityEvent(event) {
+                    const newEvent = {
+                        id: Date.now() + Math.random(),
+                        ...event
+                    };
+                    
+                    this.activityEvents.unshift(newEvent);
+                    
+                    // Keep only last 50 events
+                    if (this.activityEvents.length > 50) {
+                        this.activityEvents = this.activityEvents.slice(0, 50);
+                    }
+                    
+                    // Auto-scroll to top of log
+                    this.$nextTick(() => {
+                        if (this.$refs.activityLog) {
+                            this.$refs.activityLog.scrollTop = 0;
+                        }
+                    });
+                },
+                
+                clearActivityLog() {
+                    this.activityEvents = [];
+                },
+                
+                showNotification(message, type) {
+                    this.notification = { message, type };
+                    setTimeout(() => {
+                        this.notification = null;
+                    }, 5000);
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

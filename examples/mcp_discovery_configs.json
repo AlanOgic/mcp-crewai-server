@@ -1,0 +1,309 @@
+{
+  "mcp_server_discovery_configs": {
+    "development_environment": {
+      "description": "Common MCP servers for development teams",
+      "servers": [
+        {
+          "name": "github_mcp",
+          "command": ["python", "-m", "github_mcp"],
+          "description": "GitHub repository management, issues, PRs, releases",
+          "capabilities": ["version_control", "code_review", "project_management"],
+          "use_cases": ["code_collaboration", "issue_tracking", "release_management"]
+        },
+        {
+          "name": "docker_mcp", 
+          "command": ["python", "-m", "docker_mcp"],
+          "description": "Docker container and image management",
+          "capabilities": ["containerization", "deployment", "orchestration"],
+          "use_cases": ["application_deployment", "environment_management", "scaling"]
+        },
+        {
+          "name": "postgres_mcp",
+          "command": ["python", "-m", "postgres_mcp"], 
+          "description": "PostgreSQL database operations and queries",
+          "capabilities": ["database_management", "sql_queries", "data_analysis"],
+          "use_cases": ["data_storage", "analytics", "reporting"]
+        },
+        {
+          "name": "slack_mcp",
+          "command": ["python", "-m", "slack_mcp"],
+          "description": "Slack workspace communication and automation",
+          "capabilities": ["messaging", "notifications", "workflow_automation"],
+          "use_cases": ["team_communication", "alerts", "status_updates"]
+        }
+      ]
+    },
+    
+    "content_marketing_environment": {
+      "description": "MCP servers for content marketing teams",
+      "servers": [
+        {
+          "name": "notion_mcp",
+          "command": ["python", "-m", "notion_mcp"],
+          "description": "Notion workspace and database management",
+          "capabilities": ["content_planning", "knowledge_management", "collaboration"],
+          "use_cases": ["editorial_calendar", "content_strategy", "team_collaboration"]
+        },
+        {
+          "name": "google_drive_mcp",
+          "command": ["python", "-m", "google_drive_mcp"],
+          "description": "Google Drive file management and sharing",
+          "capabilities": ["file_storage", "document_collaboration", "sharing"],
+          "use_cases": ["asset_management", "document_sharing", "version_control"]
+        },
+        {
+          "name": "social_media_mcp",
+          "command": ["python", "-m", "social_media_mcp"],
+          "description": "Social media platform management and posting",
+          "capabilities": ["content_publishing", "social_analytics", "audience_engagement"],
+          "use_cases": ["content_distribution", "engagement_tracking", "brand_management"]
+        },
+        {
+          "name": "canva_mcp",
+          "command": ["python", "-m", "canva_mcp"],
+          "description": "Canva design and graphics creation",
+          "capabilities": ["graphic_design", "template_creation", "brand_assets"],
+          "use_cases": ["visual_content", "marketing_materials", "brand_consistency"]
+        },
+        {
+          "name": "analytics_mcp",
+          "command": ["python", "-m", "analytics_mcp"],
+          "description": "Google Analytics and performance tracking",
+          "capabilities": ["web_analytics", "performance_metrics", "reporting"],
+          "use_cases": ["content_performance", "audience_insights", "roi_tracking"]
+        }
+      ]
+    },
+    
+    "data_science_environment": {
+      "description": "MCP servers for data science and analytics teams", 
+      "servers": [
+        {
+          "name": "jupyter_mcp",
+          "command": ["python", "-m", "jupyter_mcp"],
+          "description": "Jupyter notebook management and execution",
+          "capabilities": ["data_analysis", "machine_learning", "visualization"],
+          "use_cases": ["exploratory_analysis", "model_development", "research"]
+        },
+        {
+          "name": "kaggle_mcp",
+          "command": ["python", "-m", "kaggle_mcp"],
+          "description": "Kaggle datasets and competition management",
+          "capabilities": ["dataset_discovery", "competition_participation", "model_sharing"],
+          "use_cases": ["data_sourcing", "benchmarking", "community_engagement"]
+        },
+        {
+          "name": "aws_mcp",
+          "command": ["python", "-m", "aws_mcp"],
+          "description": "AWS cloud services management",
+          "capabilities": ["cloud_infrastructure", "ml_services", "data_storage"],
+          "use_cases": ["model_deployment", "data_pipeline", "scaling"]
+        },
+        {
+          "name": "tableau_mcp",
+          "command": ["python", "-m", "tableau_mcp"],
+          "description": "Tableau dashboard and visualization management",
+          "capabilities": ["data_visualization", "dashboard_creation", "reporting"],
+          "use_cases": ["business_intelligence", "stakeholder_reporting", "insights_sharing"]
+        }
+      ]
+    },
+    
+    "customer_service_environment": {
+      "description": "MCP servers for customer service teams",
+      "servers": [
+        {
+          "name": "zendesk_mcp",
+          "command": ["python", "-m", "zendesk_mcp"],
+          "description": "Zendesk ticket and customer support management",
+          "capabilities": ["ticket_management", "customer_communication", "knowledge_base"],
+          "use_cases": ["support_tickets", "customer_satisfaction", "issue_resolution"]
+        },
+        {
+          "name": "intercom_mcp",
+          "command": ["python", "-m", "intercom_mcp"],
+          "description": "Intercom messaging and customer engagement",
+          "capabilities": ["live_chat", "customer_messaging", "user_engagement"],
+          "use_cases": ["real_time_support", "user_onboarding", "engagement_tracking"]
+        },
+        {
+          "name": "salesforce_mcp",
+          "command": ["python", "-m", "salesforce_mcp"],
+          "description": "Salesforce CRM and customer data management",
+          "capabilities": ["customer_data", "sales_pipeline", "relationship_management"],
+          "use_cases": ["customer_history", "sales_coordination", "data_insights"]
+        },
+        {
+          "name": "twilio_mcp",
+          "command": ["python", "-m", "twilio_mcp"],
+          "description": "Twilio SMS, voice, and communication APIs",
+          "capabilities": ["sms_messaging", "voice_calls", "communication_automation"],
+          "use_cases": ["customer_notifications", "automated_responses", "multi_channel_support"]
+        }
+      ]
+    },
+    
+    "creative_production_environment": {
+      "description": "MCP servers for creative and design teams",
+      "servers": [
+        {
+          "name": "figma_mcp",
+          "command": ["python", "-m", "figma_mcp"],
+          "description": "Figma design file and collaboration management",
+          "capabilities": ["design_collaboration", "prototyping", "design_system"],
+          "use_cases": ["ui_design", "design_review", "asset_management"]
+        },
+        {
+          "name": "adobe_mcp",
+          "command": ["python", "-m", "adobe_mcp"],
+          "description": "Adobe Creative Suite integration",
+          "capabilities": ["image_editing", "video_production", "creative_assets"],
+          "use_cases": ["professional_design", "brand_assets", "multimedia_content"]
+        },
+        {
+          "name": "unsplash_mcp",
+          "command": ["python", "-m", "unsplash_mcp"],
+          "description": "Unsplash stock photography and images",
+          "capabilities": ["stock_photography", "image_search", "visual_content"],
+          "use_cases": ["content_imagery", "marketing_visuals", "design_inspiration"]
+        },
+        {
+          "name": "youtube_mcp",
+          "command": ["python", "-m", "youtube_mcp"],
+          "description": "YouTube video management and analytics",
+          "capabilities": ["video_publishing", "analytics", "content_management"],
+          "use_cases": ["video_marketing", "content_distribution", "audience_engagement"]
+        }
+      ]
+    },
+    
+    "business_intelligence_environment": {
+      "description": "MCP servers for business intelligence and strategy teams",
+      "servers": [
+        {
+          "name": "excel_mcp",
+          "command": ["python", "-m", "excel_mcp"],
+          "description": "Microsoft Excel spreadsheet management and automation",
+          "capabilities": ["spreadsheet_automation", "data_analysis", "reporting"],
+          "use_cases": ["financial_modeling", "data_processing", "business_reporting"]
+        },
+        {
+          "name": "powerbi_mcp",
+          "command": ["python", "-m", "powerbi_mcp"],
+          "description": "Power BI dashboard and analytics platform",
+          "capabilities": ["business_intelligence", "dashboard_creation", "data_visualization"],
+          "use_cases": ["executive_dashboards", "kpi_tracking", "business_insights"]
+        },
+        {
+          "name": "quickbooks_mcp",
+          "command": ["python", "-m", "quickbooks_mcp"],
+          "description": "QuickBooks accounting and financial management",
+          "capabilities": ["financial_data", "accounting", "reporting"],
+          "use_cases": ["financial_analysis", "budget_tracking", "expense_management"]
+        },
+        {
+          "name": "hubspot_mcp",
+          "command": ["python", "-m", "hubspot_mcp"],
+          "description": "HubSpot CRM and marketing automation",
+          "capabilities": ["lead_management", "marketing_automation", "sales_pipeline"],
+          "use_cases": ["lead_tracking", "marketing_campaigns", "sales_analytics"]
+        }
+      ]
+    }
+  },
+  
+  "discovery_strategies": {
+    "personality_based_discovery": {
+      "description": "Connect agents to servers based on their personality traits",
+      "mapping": {
+        "analytical": ["postgres_mcp", "excel_mcp", "analytics_mcp", "tableau_mcp"],
+        "creative": ["canva_mcp", "figma_mcp", "adobe_mcp", "unsplash_mcp"],
+        "collaborative": ["slack_mcp", "notion_mcp", "intercom_mcp", "github_mcp"],
+        "executor": ["docker_mcp", "aws_mcp", "automation_mcp", "deployment_mcp"],
+        "innovator": ["kaggle_mcp", "jupyter_mcp", "experimental_mcp", "ai_mcp"]
+      }
+    },
+    
+    "role_based_discovery": {
+      "description": "Connect agents to servers based on their assigned roles",
+      "mapping": {
+        "Content Strategist": ["notion_mcp", "analytics_mcp", "social_media_mcp"],
+        "Creative Writer": ["google_drive_mcp", "canva_mcp", "unsplash_mcp"],
+        "Data Analyst": ["postgres_mcp", "jupyter_mcp", "tableau_mcp", "excel_mcp"],
+        "Project Manager": ["slack_mcp", "notion_mcp", "github_mcp", "calendar_mcp"],
+        "DevOps Engineer": ["docker_mcp", "aws_mcp", "github_mcp", "monitoring_mcp"],
+        "Customer Support": ["zendesk_mcp", "intercom_mcp", "salesforce_mcp", "twilio_mcp"]
+      }
+    },
+    
+    "progressive_discovery": {
+      "description": "Gradually introduce agents to new MCP servers based on experience",
+      "phases": {
+        "phase_1_basics": {
+          "description": "Essential tools for new agents",
+          "servers": ["slack_mcp", "google_drive_mcp", "github_mcp"],
+          "trigger": "agent_creation"
+        },
+        "phase_2_specialization": {
+          "description": "Role-specific tools after initial experience",
+          "servers": "role_based_mapping",
+          "trigger": "after_5_successful_tasks"
+        },
+        "phase_3_advanced": {
+          "description": "Advanced tools for experienced agents",
+          "servers": ["aws_mcp", "ai_mcp", "automation_mcp"],
+          "trigger": "after_2_weeks_active"
+        },
+        "phase_4_experimental": {
+          "description": "Cutting-edge tools for evolved agents",
+          "servers": ["experimental_mcp", "quantum_mcp", "neural_mcp"],
+          "trigger": "after_evolution_cycles > 3"
+        }
+      }
+    }
+  },
+  
+  "auto_discovery_rules": {
+    "team_completion": {
+      "description": "Automatically discover tools when team gaps are identified",
+      "rules": [
+        {
+          "condition": "missing_design_capabilities",
+          "action": "connect_to_design_servers",
+          "servers": ["figma_mcp", "canva_mcp", "adobe_mcp"]
+        },
+        {
+          "condition": "poor_data_analysis_performance", 
+          "action": "connect_to_analytics_servers",
+          "servers": ["postgres_mcp", "tableau_mcp", "analytics_mcp"]
+        },
+        {
+          "condition": "communication_gaps_detected",
+          "action": "connect_to_communication_servers", 
+          "servers": ["slack_mcp", "email_mcp", "calendar_mcp"]
+        }
+      ]
+    },
+    
+    "performance_optimization": {
+      "description": "Connect to performance-enhancing tools based on metrics",
+      "rules": [
+        {
+          "condition": "task_completion_time > threshold",
+          "action": "connect_to_automation_servers",
+          "servers": ["automation_mcp", "workflow_mcp", "efficiency_mcp"]
+        },
+        {
+          "condition": "collaboration_score < 0.6",
+          "action": "connect_to_collaboration_servers",
+          "servers": ["notion_mcp", "slack_mcp", "meeting_mcp"]
+        },
+        {
+          "condition": "creative_output_quality_declining",
+          "action": "connect_to_inspiration_servers",
+          "servers": ["unsplash_mcp", "inspiration_mcp", "trends_mcp"]
+        }
+      ]
+    }
+  }
+}

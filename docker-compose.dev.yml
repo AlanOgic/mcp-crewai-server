@@ -1,0 +1,124 @@
+# MCP CrewAI Server - Development Docker Compose
+# Simplified setup for development and testing
+
+version: '3.8'
+
+services:
+  # Main MCP CrewAI Server (Development)
+  mcp-crewai-server:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: mcp-crewai-dev
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "8765:8765"
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+    environment:
+      # Core configuration
+      - MCP_SERVER_HOST=0.0.0.0
+      - MCP_SERVER_PORT=8765
+      - LOG_LEVEL=DEBUG
+      
+      # Development settings
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - ENABLE_TLS=false
+      - API_KEY_REQUIRED=false
+      
+      # LLM Configuration  
+      - DEFAULT_LLM_PROVIDER=${DEFAULT_LLM_PROVIDER:-openai}
+      - DEFAULT_MODEL=${DEFAULT_MODEL:-gpt-4-turbo-preview}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      
+      # Revolutionary Features (enabled for testing)
+      - EVOLUTION_ENABLED=true
+      - DYNAMIC_INSTRUCTIONS_ENABLED=true
+      - MEMORY_ENABLED=true
+      - BACKGROUND_TASKS_ENABLED=true
+      
+      # Simplified persistence
+      - MEMORY_DATABASE_PATH=/app/data/agent_memory.db
+      
+    volumes:
+      # Development volumes
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./.env:/app/.env:ro
+      
+      # Hot reload (if using development mode)
+      - ./src:/app/src
+      
+    networks:
+      - mcp-dev-network
+      
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8765/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Lightweight Redis for development
+  redis-dev:
+    image: redis:7-alpine
+    container_name: mcp-redis-dev
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "999:1000"  # redis user
+    # Remove public port exposure even in dev
+    expose:
+      - "6379"
+    networks:
+      - mcp-dev-network
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.25'
+        reservations:
+          memory: 64M
+          cpus: '0.1'
+    command: redis-server --appendonly yes --requirepass devpassword123
+
+  # Optional: Lightweight monitoring
+  prometheus-dev:
+    image: prom/prometheus:latest
+    container_name: mcp-prometheus-dev
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "65534:65534"  # nobody user
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks:
+      - mcp-dev-network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+    profiles:
+      - monitoring
+
+# Development network
+networks:
+  mcp-dev-network:
+    driver: bridge

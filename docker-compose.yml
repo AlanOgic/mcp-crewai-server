@@ -1,0 +1,363 @@
+# MCP CrewAI Server - Production Docker Compose
+
+services:
+  # Main MCP CrewAI Server
+  mcp-crewai-server:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: mcp-crewai-server
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    # Remove public port exposure - accessible via nginx proxy
+    expose:
+      - "8765"
+      - "8443"
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+    environment:
+      # Core configuration
+      - MCP_SERVER_HOST=0.0.0.0
+      - MCP_SERVER_PORT=8765
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      
+      # Security
+      - ENABLE_TLS=${ENABLE_TLS:-true}
+      - TLS_CERT_PATH=/app/certs/server.crt
+      - TLS_KEY_PATH=/app/certs/server.key
+      - API_KEY_REQUIRED=${API_KEY_REQUIRED:-true}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-https://${SSL_DOMAIN:-localhost}}
+      - RATE_LIMIT_ENABLED=true
+      - MAX_REQUESTS_PER_MINUTE=60
+      
+      # LLM Configuration  
+      - DEFAULT_LLM_PROVIDER=${DEFAULT_LLM_PROVIDER:-openai}
+      - DEFAULT_MODEL=${DEFAULT_MODEL:-gpt-4-turbo-preview}
+      - OPENAI_API_KEY_FILE=/run/secrets/openai_api_key
+      - ANTHROPIC_API_KEY_FILE=/run/secrets/anthropic_api_key
+      - CREWAI_API_KEY_FILE=/run/secrets/crewai_api_key
+      
+      # Revolutionary Features
+      - EVOLUTION_ENABLED=${EVOLUTION_ENABLED:-true}
+      - DYNAMIC_INSTRUCTIONS_ENABLED=${DYNAMIC_INSTRUCTIONS_ENABLED:-true}
+      - MEMORY_ENABLED=${MEMORY_ENABLED:-true}
+      - BACKGROUND_TASKS_ENABLED=${BACKGROUND_TASKS_ENABLED:-true}
+      
+      # Database
+      - MEMORY_DATABASE_PATH=/app/data/agent_memory.db
+      - METRICS_EXPORT_PATH=/app/data/metrics.json
+      
+      # External integrations
+      - REDIS_URL=redis://redis:6379
+      - POSTGRES_URL_FILE=/run/secrets/postgres_url
+      
+    volumes:
+      # Persistent data
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./certs:/app/certs:ro
+      
+      # Configuration
+      - ./.env:/app/.env:ro
+    
+    secrets:
+      - openai_api_key
+      - anthropic_api_key
+      - crewai_api_key
+      - postgres_url
+      
+    depends_on:
+      - redis
+      - postgres
+      
+    networks:
+      - mcp-network
+      
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8765/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Redis for caching and session management
+  redis:
+    image: redis:7-alpine
+    container_name: mcp-redis
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "999:1000"  # redis user
+    # Remove public port exposure for security
+    expose:
+      - "6379"
+    volumes:
+      - redis_data:/data
+      - ./docker/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    command: redis-server /usr/local/etc/redis/redis.conf --requirepass ${REDIS_PASSWORD}
+    environment:
+      - REDIS_PASSWORD_FILE=/run/secrets/redis_password
+    networks:
+      - mcp-network
+    secrets:
+      - redis_password
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+    healthcheck:
+      test: ["CMD", "redis-cli", "--no-auth-warning", "auth", "${REDIS_PASSWORD}", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # PostgreSQL for persistent storage
+  postgres:
+    image: postgres:15-alpine
+    container_name: mcp-postgres
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "70:70"  # postgres user
+    environment:
+      - POSTGRES_DB=crewai_db
+      - POSTGRES_USER=crewai
+      - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    # Remove public port exposure - only accessible within Docker network
+    expose:
+      - "5432"
+    networks:
+      - mcp-network
+    secrets:
+      - postgres_password
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crewai -d crewai_db"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Nginx reverse proxy with SSL termination
+  nginx:
+    image: nginx:alpine
+    container_name: mcp-nginx
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "101:101"  # nginx user
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/ssl.conf:/etc/nginx/ssl.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+      - ./logs/nginx:/var/log/nginx
+    depends_on:
+      mcp-crewai-server:
+        condition: service_healthy
+    networks:
+      - mcp-network
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.25'
+        reservations:
+          memory: 64M
+          cpus: '0.1'
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Monitoring with Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: mcp-prometheus
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "65534:65534"  # nobody user
+    # Remove public port exposure - only accessible internally
+    expose:
+      - "9090"
+    volumes:
+      - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--storage.tsdb.retention.size=10GB'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--web.listen-address=0.0.0.0:9090'
+      - '--web.external-url=https://${SSL_DOMAIN:-localhost}/prometheus/'
+    networks:
+      - mcp-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    profiles:
+      - monitoring
+
+  # Grafana for metrics visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: mcp-grafana
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "472:0"  # grafana user
+    # Remove public port exposure - accessible via nginx proxy
+    expose:
+      - "3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD_FILE=/run/secrets/grafana_password
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=https://${SSL_DOMAIN:-localhost}/grafana/
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+      - GF_SECURITY_COOKIE_SECURE=true
+      - GF_SECURITY_COOKIE_SAMESITE=strict
+      - GF_SECURITY_STRICT_TRANSPORT=true
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./docker/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    depends_on:
+      - prometheus
+    networks:
+      - mcp-network
+    secrets:
+      - grafana_password
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+    profiles:
+      - monitoring
+
+  # Log aggregation with ELK stack (optional)
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: mcp-elasticsearch
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "1000:1000"  # elasticsearch user
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=true
+      - xpack.security.authc.anonymous.roles=monitoring
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - ELASTIC_PASSWORD_FILE=/run/secrets/elastic_password
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    # Remove public port exposure
+    expose:
+      - "9200"
+    networks:
+      - mcp-network
+    secrets:
+      - elastic_password
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+    profiles:
+      - monitoring
+
+  # Backup service for database and data
+  backup:
+    image: alpine:latest
+    container_name: mcp-backup
+    restart: "no"
+    volumes:
+      - ./data:/app/data:ro
+      - ./backups:/backups
+      - ./docker/backup.sh:/backup.sh:ro
+    command: /backup.sh
+    depends_on:
+      - postgres
+      - mcp-crewai-server
+    networks:
+      - mcp-network
+
+# Docker secrets for sensitive data
+secrets:
+  postgres_password:
+    file: ./secrets/postgres_password.txt
+  postgres_url:
+    file: ./secrets/postgres_url.txt
+  redis_password:
+    file: ./secrets/redis_password.txt
+  grafana_password:
+    file: ./secrets/grafana_password.txt
+  elastic_password:
+    file: ./secrets/elastic_password.txt
+  openai_api_key:
+    file: ./secrets/openai_api_key.txt
+  anthropic_api_key:
+    file: ./secrets/anthropic_api_key.txt
+  crewai_api_key:
+    file: ./secrets/crewai_api_key.txt
+
+# Named volumes for persistence
+volumes:
+  redis_data:
+    driver: local
+  postgres_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+
+# Network configuration
+networks:
+  mcp-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
