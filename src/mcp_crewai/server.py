@@ -39,6 +39,174 @@ config = get_config()
 logging.basicConfig(level=getattr(logging, config.log_level.upper()))
 logger = logging.getLogger(__name__)
 
+def create_llm():
+    """Create and configure LLM based on configuration settings with multi-provider support"""
+    import sys
+    import io
+    import contextlib
+    import os
+    
+    # Temporarily redirect streams during LLM imports
+    original_stdout = sys.stdout
+    original_stderr = sys.stderr
+    
+    try:
+        safe_stdout = io.StringIO()
+        safe_stderr = io.StringIO()
+        
+        with contextlib.redirect_stdout(safe_stdout), contextlib.redirect_stderr(safe_stderr):
+            llm_config = config.get_llm_config()
+            provider = llm_config.get("provider", "openai").lower()
+            model = llm_config.get("model", "gpt-4-turbo-preview")
+            api_key = llm_config.get("api_key")
+            base_url = llm_config.get("base_url")  # For Ollama and custom endpoints
+            
+            # 🤖 ANTHROPIC (Claude)
+            if provider == "anthropic":
+                if not api_key:
+                    raise ValueError("Anthropic API key is required. Set ANTHROPIC_API_KEY environment variable.")
+                
+                from langchain_anthropic import ChatAnthropic
+                logger.info(f"🤖 Creating Anthropic Claude LLM: {model}")
+                return ChatAnthropic(
+                    model=model,
+                    anthropic_api_key=api_key,
+                    temperature=0.1,
+                    max_tokens=4096
+                )
+            
+            # 🔴 OPENAI (GPT)
+            elif provider == "openai":
+                if not api_key:
+                    raise ValueError("OpenAI API key is required. Set OPENAI_API_KEY environment variable.")
+                
+                from langchain_openai import ChatOpenAI
+                logger.info(f"🔴 Creating OpenAI GPT LLM: {model}")
+                return ChatOpenAI(
+                    model=model,
+                    openai_api_key=api_key,
+                    temperature=0.1,
+                    max_tokens=4096
+                )
+            
+            # 🦙 OLLAMA (Local)
+            elif provider == "ollama":
+                from langchain_ollama import ChatOllama
+                ollama_base_url = base_url or "http://localhost:11434"
+                logger.info(f"🦙 Creating Ollama LLM: {model} at {ollama_base_url}")
+                return ChatOllama(
+                    model=model,
+                    base_url=ollama_base_url,
+                    temperature=0.1
+                )
+            
+            # 💎 GOOGLE GEMINI
+            elif provider == "gemini" or provider == "google":
+                if not api_key:
+                    raise ValueError("Google API key is required. Set GOOGLE_API_KEY environment variable.")
+                
+                from langchain_google_genai import ChatGoogleGenerativeAI
+                logger.info(f"💎 Creating Google Gemini LLM: {model}")
+                return ChatGoogleGenerativeAI(
+                    model=model,
+                    google_api_key=api_key,
+                    temperature=0.1,
+                    max_output_tokens=4096
+                )
+            
+            # 🌐 GROQ (Fast API)
+            elif provider == "groq":
+                if not api_key:
+                    raise ValueError("Groq API key is required. Set GROQ_API_KEY environment variable.")
+                
+                from langchain_groq import ChatGroq
+                logger.info(f"🌐 Creating Groq LLM: {model}")
+                return ChatGroq(
+                    model=model,
+                    groq_api_key=api_key,
+                    temperature=0.1,
+                    max_tokens=4096
+                )
+            
+            # 🔵 AZURE OPENAI
+            elif provider == "azure" or provider == "azure_openai":
+                azure_endpoint = llm_config.get("azure_endpoint") or os.getenv("AZURE_OPENAI_ENDPOINT")
+                azure_api_version = llm_config.get("azure_api_version", "2024-02-01")
+                
+                if not api_key or not azure_endpoint:
+                    raise ValueError("Azure OpenAI requires API key and endpoint. Set AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT.")
+                
+                from langchain_openai import AzureChatOpenAI
+                logger.info(f"🔵 Creating Azure OpenAI LLM: {model}")
+                return AzureChatOpenAI(
+                    deployment_name=model,
+                    azure_endpoint=azure_endpoint,
+                    openai_api_key=api_key,
+                    openai_api_version=azure_api_version,
+                    temperature=0.1,
+                    max_tokens=4096
+                )
+            
+            # ❓ UNKNOWN PROVIDER
+            else:
+                supported_providers = ["anthropic", "openai", "ollama", "gemini", "google", "groq", "azure", "azure_openai"]
+                raise ValueError(f"Unsupported LLM provider: {provider}. Supported providers: {', '.join(supported_providers)}")
+                
+    except Exception as e:
+        logger.error(f"❌ Failed to create {provider} LLM: {e}")
+        
+        # Smart fallback: Try to find any available provider
+        logger.warning("🔄 Attempting smart fallback to available providers...")
+        
+        # Try Ollama first (no API key needed)
+        try:
+            from langchain_ollama import ChatOllama
+            logger.info("🦙 Fallback: Using Ollama with llama3.2 model")
+            return ChatOllama(
+                model="llama3.2",
+                base_url="http://localhost:11434",
+                temperature=0.1
+            )
+        except Exception:
+            pass
+        
+        # Try OpenAI if key available
+        try:
+            openai_key = os.getenv("OPENAI_API_KEY")
+            if openai_key:
+                from langchain_openai import ChatOpenAI
+                logger.info("🔴 Fallback: Using OpenAI GPT-4")
+                return ChatOpenAI(
+                    model="gpt-4-turbo-preview",
+                    openai_api_key=openai_key,
+                    temperature=0.1,
+                    max_tokens=4096
+                )
+        except Exception:
+            pass
+        
+        # Try Anthropic if key available
+        try:
+            anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+            if anthropic_key:
+                from langchain_anthropic import ChatAnthropic
+                logger.info("🤖 Fallback: Using Anthropic Claude")
+                return ChatAnthropic(
+                    model="claude-3-5-sonnet-20241022",
+                    anthropic_api_key=anthropic_key,
+                    temperature=0.1,
+                    max_tokens=4096
+                )
+        except Exception:
+            pass
+        
+        # Ultimate failure
+        raise Exception(f"Could not create any LLM instance. Original error: {e}")
+        
+    finally:
+        sys.stdout = original_stdout
+        sys.stderr = original_stderr
+
 
 class MCPCrewAIServer:
     """
@@ -842,11 +1010,21 @@ class MCPCrewAIServer:
         
         # Create evolving agents with MCP client capabilities
         agents = []
+        
+        # Create LLM instance for all agents
+        try:
+            llm = create_llm()
+            logger.info(f"🤖 Created LLM instance: {llm.__class__.__name__}")
+        except Exception as e:
+            logger.error(f"❌ Failed to create LLM: {e}")
+            raise Exception(f"Cannot create agents without LLM: {e}")
+        
         for agent_config in agents_config:
             agent = MCPClientAgent(
                 role=agent_config["role"],
                 goal=agent_config["goal"],
                 backstory=agent_config["backstory"],
+                llm=llm,  # Configure the LLM for this agent
                 verbose=True,
                 allow_delegation=False
             )
@@ -854,6 +1032,9 @@ class MCPCrewAIServer:
             # Apply personality preset if specified
             if "personality_preset" in agent_config:
                 self._apply_personality_preset(agent, agent_config["personality_preset"])
+            
+            # Connect agent to real MCP servers instead of mock tools
+            await self._connect_agent_to_mcp_servers(agent)
             
             agents.append(agent)
             self.agents[agent.agent_id] = agent
@@ -869,21 +1050,22 @@ class MCPCrewAIServer:
             safe_stdout = io.StringIO()
             safe_stderr = io.StringIO()
             with contextlib.redirect_stdout(safe_stdout), contextlib.redirect_stderr(safe_stderr):
-                from crewai import Task
+                from crewai import Task, Process
         finally:
             sys.stdout = original_stdout
             sys.stderr = original_stderr
         tasks = []
-        for task_config in tasks_config:
-            # Find agent by role if specified
+        for i, task_config in enumerate(tasks_config):
+            # Find agent by role if specified, or distribute tasks across agents
             assigned_agent = None
             if "agent_role" in task_config:
                 assigned_agent = next(
                     (a for a in agents if a.role == task_config["agent_role"]), 
-                    agents[0]
+                    agents[i % len(agents)]
                 )
             else:
-                assigned_agent = agents[0]
+                # Distribute tasks across all available agents for hierarchical coordination
+                assigned_agent = agents[i % len(agents)]
             
             # Generate expected_output if not provided
             expected_output = task_config.get(
@@ -898,10 +1080,13 @@ class MCPCrewAIServer:
             )
             tasks.append(task)
         
-        # Create autonomous crew
+        # Create autonomous crew with sequential process for reliable task execution
+        # Note: Sequential process executes all tasks in order, ensuring complete deliverables
+        # Task distribution is handled by our round-robin assignment (line 895)
         crew = AutonomousCrew(
             agents=agents,
             tasks=tasks,
+            process=Process.sequential,  # Sequential ensures all tasks execute
             verbose=True
         )
         crew.autonomy_level = autonomy_level
@@ -963,7 +1148,10 @@ class MCPCrewAIServer:
         workflow = WorkflowContext(crew_id, crew)
         self.active_workflows[crew_id] = workflow
         
-        # Autonomous decision making before execution
+        # Wait for MCP connections to be established before autonomous decision making
+        await self._ensure_mcp_connections_ready(crew)
+        
+        # Autonomous decision making after MCP connections are ready
         if allow_evolution and crew.autonomy_level > 0.3:
             decision = crew.make_autonomous_decision(context)
             if decision["action"] != "continue":
@@ -1247,10 +1435,19 @@ class MCPCrewAIServer:
         goal = args["goal"]
         customizations = args.get("customizations", {})
         
+        # Create LLM instance for the agent
+        try:
+            llm = create_llm()
+            logger.info(f"🤖 Created LLM instance for template agent: {llm.__class__.__name__}")
+        except Exception as e:
+            logger.error(f"❌ Failed to create LLM: {e}")
+            raise Exception(f"Cannot create agent without LLM: {e}")
+        
         agent = EvolvingAgent(
             role=role,
             goal=goal,
             backstory=f"I am a {template} specialist focused on {goal}",
+            llm=llm,  # Configure the LLM for this agent
             verbose=True
         )
         
@@ -1594,6 +1791,56 @@ class MCPCrewAIServer:
                 "message": f"❌ Auto-discovery failed: {str(e)}"
             }
             return [TextContent(type="text", text=json.dumps(error_result, indent=2))]
+    
+    async def _connect_agent_to_mcp_servers(self, agent) -> None:
+        """Connect agent to multiple MCP servers automatically"""
+        if not isinstance(agent, MCPClientAgent):
+            logger.warning(f"Agent {getattr(agent, 'agent_id', 'unknown')} is not an MCPClientAgent, skipping MCP server connections")
+            return
+        
+        # Define MCP servers based on user's Claude Desktop configuration
+        mcp_servers_config = [
+            {
+                "name": "context7",
+                "command": ["npx", "-y", "@upstash/context7-mcp"],
+                "description": "Documentation and library search tools",
+                "capabilities": ["search", "documentation", "library-lookup"]
+            },
+            {
+                "name": "odoo", 
+                "command": ["docker", "run", "-i", "--rm", "-e", "ODOO_URL", "-e", "ODOO_DB", "-e", "ODOO_USERNAME", "-e", "ODOO_PASSWORD", "mcp/odoo"],
+                "description": "ERP and business management tools",
+                "capabilities": ["employee-search", "holiday-search", "business-data"]
+            },
+            {
+                "name": "mcp_docker",
+                "command": ["docker", "mcp", "gateway", "run"],
+                "description": "Docker containerized tools gateway",
+                "capabilities": ["containerized-tools", "docker-services"]
+            }
+        ]
+        
+        logger.info(f"🔌 Connecting agent {agent.agent_id} to {len(mcp_servers_config)} MCP servers...")
+        
+        connected_count = 0
+        for server_config in mcp_servers_config:
+            try:
+                await agent.connect_to_mcp_server(server_config)
+                connected_count += 1
+                logger.info(f"✅ Agent {agent.agent_id} connected to {server_config['name']} MCP server")
+            except Exception as e:
+                logger.warning(f"⚠️  Failed to connect agent {agent.agent_id} to MCP server {server_config['name']}: {str(e)}")
+        
+        logger.info(f"🎯 Agent {agent.agent_id} connected to {connected_count}/{len(mcp_servers_config)} MCP servers")
+        
+        # Ensure the agent has at least some tools available even if MCP connections fail
+        if connected_count == 0:
+            logger.warning(f"🔄 No MCP servers connected for agent {agent.agent_id}, adding fallback tools")
+            agent.available_tools = {
+                "web_search": {"description": "Search the internet for information"},
+                "text_generation": {"description": "Generate text content"},
+                "analysis": {"description": "Analyze data and information"}
+            }
     
     async def _get_server_config(self, args: Dict[str, Any]) -> List[TextContent]:
         """Get complete server configuration and status"""
@@ -2909,6 +3156,48 @@ TASKS COMPLETED: {len(crew.tasks)}
             }
         
         return [TextContent(type="text", text=json.dumps(result, indent=2))]
+    
+    async def _ensure_mcp_connections_ready(self, crew) -> None:
+        """Ensure all MCP connections are established before making autonomous decisions"""
+        max_wait_time = 5.0  # Maximum time to wait for connections (seconds)
+        check_interval = 0.1  # Check every 100ms
+        elapsed_time = 0.0
+        
+        logger.info(f"🔗 Waiting for MCP connections to be ready for crew {crew.crew_id}")
+        
+        while elapsed_time < max_wait_time:
+            all_connected = True
+            
+            for agent in crew.agents:
+                # Check if agent is MCPClientAgent and needs connections
+                if isinstance(agent, MCPClientAgent):
+                    # If agent has mcp_servers configured but none are connected
+                    if hasattr(agent, 'mcp_servers') and agent.mcp_servers:
+                        connected_count = sum(1 for conn in agent.mcp_servers.values() if conn.connected)
+                        if connected_count == 0:
+                            all_connected = False
+                            break
+                    # If agent has no mcp_servers yet, they might still be connecting
+                    elif not hasattr(agent, 'mcp_servers') or not agent.mcp_servers:
+                        # Give a short grace period for connections to be established
+                        if elapsed_time < 1.0:  # Wait at least 1 second for initial connections
+                            all_connected = False
+                            break
+            
+            if all_connected:
+                logger.info(f"✅ All MCP connections ready for crew {crew.crew_id}")
+                return
+            
+            await asyncio.sleep(check_interval)
+            elapsed_time += check_interval
+        
+        # Log warning if connections aren't ready but continue anyway
+        logger.warning(f"⚠️ MCP connections not fully ready after {max_wait_time}s, proceeding anyway")
+        
+        # Update resource adequacy check to handle partially connected state
+        for agent in crew.agents:
+            if isinstance(agent, MCPClientAgent):
+                logger.info(f"🔌 Agent {agent.agent_id} MCP status: {agent.get_mcp_status()}")
     
     async def run(self, transport_options: Dict[str, Any] = None):
         """Run the MCP server"""

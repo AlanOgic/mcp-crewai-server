@@ -246,11 +246,16 @@ async def demo_4_mcp_client_integration():
     
     # Create an MCP-enabled agent
     from mcp_crewai.mcp_client_agent import MCPClientAgent
+    from mcp_crewai.server import create_llm
+    
+    # Create LLM for the agent
+    llm = create_llm()
     
     agent = MCPClientAgent(
         role="Universal Tool Agent",
         goal="Use any available MCP tool to solve problems",
         backstory="Advanced agent with access to unlimited MCP servers",
+        llm=llm,  # Configure the LLM
         verbose=False
     )
     

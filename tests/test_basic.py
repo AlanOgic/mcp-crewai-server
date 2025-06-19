@@ -32,11 +32,16 @@ async def test_personality_templates():
     
     # Create a test agent with analytical preset
     from mcp_crewai.mcp_client_agent import MCPClientAgent
+    from mcp_crewai.server import create_llm
+    
+    # Create LLM for the agent
+    llm = create_llm()
     
     agent = MCPClientAgent(
         role="Test Analyst",
         goal="Test goal", 
         backstory="Test backstory",
+        llm=llm,  # Configure the LLM
         verbose=False
     )
     

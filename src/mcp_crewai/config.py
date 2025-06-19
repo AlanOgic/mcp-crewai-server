@@ -23,16 +23,29 @@ class MCPServerConfig(BaseSettings):
     # 🤖 AI MODEL API KEYS
     # ===============================================
     
+    # Core LLM Provider API Keys
     openai_api_key: Optional[str] = Field(default=None, description="OpenAI API key")
     anthropic_api_key: Optional[str] = Field(default=None, description="Anthropic API key")
+    google_api_key: Optional[str] = Field(default=None, description="Google Gemini API key")
+    groq_api_key: Optional[str] = Field(default=None, description="Groq API key")
+    
+    # Azure OpenAI Configuration
+    azure_openai_api_key: Optional[str] = Field(default=None, description="Azure OpenAI API key")
+    azure_openai_endpoint: Optional[str] = Field(default=None, description="Azure OpenAI endpoint")
+    azure_api_version: str = Field(default="2024-02-01", description="Azure OpenAI API version")
+    
+    # Ollama Configuration (Local)
+    ollama_base_url: str = Field(default="http://localhost:11434", description="Ollama base URL")
+    
+    # Other API Keys
     crewai_api_key: Optional[str] = Field(default=None, description="CrewAI API key")
     
     # ===============================================
     # 🚀 MCP SERVER CONFIGURATION
     # ===============================================
     
-    default_llm_provider: str = Field(default="openai", description="Default LLM provider")
-    default_model: str = Field(default="gpt-4-turbo-preview", description="Default model")
+    default_llm_provider: str = Field(default="anthropic", description="Default LLM provider")
+    default_model: str = Field(default="claude-3-5-sonnet-20241022", description="Default model")
     mcp_server_host: str = Field(default="localhost", description="MCP server host")
     mcp_server_port: int = Field(default=8765, description="MCP server port")
     
@@ -171,16 +184,46 @@ class MCPServerConfig(BaseSettings):
         return [domain.strip() for domain in self.web_mcp_allowed_domains.split(",")]
     
     def get_llm_config(self) -> dict:
-        """Get LLM configuration for agents"""
+        """Get comprehensive LLM configuration for multiple providers"""
+        provider = self.default_llm_provider.lower()
+        
         config = {
-            "provider": self.default_llm_provider,
+            "provider": provider,
             "model": self.default_model
         }
         
-        if self.default_llm_provider == "openai" and self.openai_api_key:
-            config["api_key"] = self.openai_api_key
-        elif self.default_llm_provider == "anthropic" and self.anthropic_api_key:
-            config["api_key"] = self.anthropic_api_key
+        # 🤖 ANTHROPIC (Claude)
+        if provider == "anthropic":
+            if self.anthropic_api_key:
+                config["api_key"] = self.anthropic_api_key
+        
+        # 🔴 OPENAI (GPT)
+        elif provider == "openai":
+            if self.openai_api_key:
+                config["api_key"] = self.openai_api_key
+        
+        # 🦙 OLLAMA (Local)
+        elif provider == "ollama":
+            config["base_url"] = self.ollama_base_url
+            # No API key needed for Ollama
+        
+        # 💎 GOOGLE GEMINI
+        elif provider in ["gemini", "google"]:
+            if self.google_api_key:
+                config["api_key"] = self.google_api_key
+        
+        # 🌐 GROQ (Fast API)
+        elif provider == "groq":
+            if self.groq_api_key:
+                config["api_key"] = self.groq_api_key
+        
+        # 🔵 AZURE OPENAI
+        elif provider in ["azure", "azure_openai"]:
+            if self.azure_openai_api_key:
+                config["api_key"] = self.azure_openai_api_key
+            if self.azure_openai_endpoint:
+                config["azure_endpoint"] = self.azure_openai_endpoint
+            config["azure_api_version"] = self.azure_api_version
         
         return config
     
