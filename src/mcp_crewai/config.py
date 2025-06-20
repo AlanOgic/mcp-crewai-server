@@ -44,8 +44,8 @@ class MCPServerConfig(BaseSettings):
     # 🚀 MCP SERVER CONFIGURATION
     # ===============================================
     
-    default_llm_provider: str = Field(default="anthropic", description="Default LLM provider")
-    default_model: str = Field(default="claude-3-5-sonnet-20241022", description="Default model")
+    default_llm_provider: str = Field(default="anthropic", description="Default LLM provider", env="DEFAULT_LLM_PROVIDER")
+    default_model: str = Field(default="claude-3-5-sonnet-20241022", description="Default model", env="DEFAULT_MODEL")
     mcp_server_host: str = Field(default="localhost", description="MCP server host")
     mcp_server_port: int = Field(default=8765, description="MCP server port")
     

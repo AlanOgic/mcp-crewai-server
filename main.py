@@ -8,6 +8,140 @@ Now with autonomous agent evolution capabilities!
 import sys
 import os
 import asyncio
+import tiktoken
+import subprocess
+import json
+from datetime import datetime
+
+class TokenCounter:
+    """Track tokens and calculate pricing for LLM API usage"""
+    
+    def __init__(self):
+        self.session_input_tokens = 0
+        self.session_output_tokens = 0
+        self.session_start_time = datetime.now()
+        self.input_price_per_million = float(os.getenv('MODEL_INPUT_PRICE', '0'))
+        self.output_price_per_million = float(os.getenv('MODEL_OUTPUT_PRICE', '0'))
+        
+    def count_tokens(self, text: str, model: str = "gpt-4") -> int:
+        """Count tokens in text using tiktoken"""
+        try:
+            # Use tiktoken for OpenAI models, estimate for others
+            if "gpt" in model.lower() or "o1" in model.lower() or "o3" in model.lower():
+                encoding = tiktoken.encoding_for_model(model.replace("gpt-4o", "gpt-4"))
+                return len(encoding.encode(text))
+            else:
+                # Rough estimation: ~4 chars per token for other models
+                return max(1, len(text) // 4)
+        except Exception:
+            # Fallback estimation
+            return max(1, len(text) // 4)
+    
+    def add_usage(self, input_text: str, output_text: str, model: str):
+        """Add token usage for a request"""
+        input_tokens = self.count_tokens(input_text, model)
+        output_tokens = self.count_tokens(output_text, model)
+        
+        self.session_input_tokens += input_tokens
+        self.session_output_tokens += output_tokens
+        
+        input_cost = (input_tokens / 1_000_000) * self.input_price_per_million
+        output_cost = (output_tokens / 1_000_000) * self.output_price_per_million
+        total_cost = input_cost + output_cost
+        
+        print(f"📊 Token Usage: {input_tokens:,} input + {output_tokens:,} output = {input_tokens + output_tokens:,} total")
+        print(f"💰 Request Cost: ${total_cost:.6f} (${input_cost:.6f} + ${output_cost:.6f})")
+        
+        return {
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "input_cost": input_cost,
+            "output_cost": output_cost,
+            "total_cost": total_cost
+        }
+    
+    def get_session_summary(self):
+        """Get session usage summary"""
+        total_tokens = self.session_input_tokens + self.session_output_tokens
+        total_input_cost = (self.session_input_tokens / 1_000_000) * self.input_price_per_million
+        total_output_cost = (self.session_output_tokens / 1_000_000) * self.output_price_per_million
+        total_session_cost = total_input_cost + total_output_cost
+        
+        duration = datetime.now() - self.session_start_time
+        
+        return {
+            "session_duration": str(duration).split('.')[0],
+            "total_input_tokens": self.session_input_tokens,
+            "total_output_tokens": self.session_output_tokens,
+            "total_tokens": total_tokens,
+            "total_input_cost": total_input_cost,
+            "total_output_cost": total_output_cost,
+            "total_session_cost": total_session_cost
+        }
+    
+    def print_session_summary(self):
+        """Print formatted session summary"""
+        summary = self.get_session_summary()
+        
+        print("\n" + "="*60)
+        print("📊 SESSION USAGE SUMMARY")
+        print("="*60)
+        print(f"⏱️  Duration: {summary['session_duration']}")
+        print(f"📥 Input tokens: {summary['total_input_tokens']:,}")
+        print(f"📤 Output tokens: {summary['total_output_tokens']:,}")
+        print(f"📊 Total tokens: {summary['total_tokens']:,}")
+        print(f"💰 Input cost: ${summary['total_input_cost']:.6f}")
+        print(f"💰 Output cost: ${summary['total_output_cost']:.6f}")
+        print(f"💰 TOTAL COST: ${summary['total_session_cost']:.6f}")
+        print("="*60)
+
+# Global token counter instance
+token_counter = TokenCounter()
+
+def get_ollama_models():
+    """Get actual Ollama models installed on the system"""
+    try:
+        result = subprocess.run(['ollama', 'list'], capture_output=True, text=True, timeout=10)
+        if result.returncode == 0:
+            lines = result.stdout.strip().split('\n')
+            models = {}
+            model_count = 1
+            
+            # Skip header line and parse model names
+            for line in lines[1:]:
+                if line.strip():
+                    # Extract model name (first column)
+                    model_name = line.split()[0] if line.split() else None
+                    if model_name and ':' in model_name:
+                        models[str(model_count)] = {
+                            "name": model_name,
+                            "input_price": 0.0,
+                            "output_price": 0.0,
+                            "description": "Free (Local)"
+                        }
+                        model_count += 1
+            
+            if models:
+                print(f"✅ Found {len(models)} Ollama models installed locally")
+                return models
+            else:
+                return get_default_ollama_models()
+        else:
+            print("⚠️ Ollama not accessible, using default models")
+            return get_default_ollama_models()
+    except Exception as e:
+        print(f"⚠️ Error checking Ollama models: {e}")
+        return get_default_ollama_models()
+
+def get_default_ollama_models():
+    """Default Ollama models if system detection fails"""
+    return {
+        "1": {"name": "llama3.1:8b", "input_price": 0.0, "output_price": 0.0, "description": "Free (Local) - Pull with: ollama pull llama3.1:8b"},
+        "2": {"name": "llama3.1:70b", "input_price": 0.0, "output_price": 0.0, "description": "Free (Local) - Pull with: ollama pull llama3.1:70b"},
+        "3": {"name": "codellama:7b", "input_price": 0.0, "output_price": 0.0, "description": "Free (Local) - Pull with: ollama pull codellama:7b"},
+        "4": {"name": "mistral:7b", "input_price": 0.0, "output_price": 0.0, "description": "Free (Local) - Pull with: ollama pull mistral:7b"},
+        "5": {"name": "phi3:mini", "input_price": 0.0, "output_price": 0.0, "description": "Free (Local) - Pull with: ollama pull phi3:mini"}
+    }
 
 def main():
     """Main entry point - choose execution mode"""
@@ -17,9 +151,9 @@ def main():
     
     # First let user choose LLM provider
     print("Choose LLM Provider:")
-    print("1. Anthropic (Claude)")
-    print("2. OpenAI (GPT)")
-    print("3. Ollama (Local)")
+    print("1. Ollama (Local)")
+    print("2. Anthropic (Claude)")
+    print("3. OpenAI (GPT)")
     print("4. Google (Gemini)")
     print("5. Groq (Fast inference)")
     print("")
@@ -31,57 +165,57 @@ def main():
     except (EOFError, KeyboardInterrupt):
         llm_choice = "1"
     
-    # Set LLM provider and get available models
+    # Set LLM provider and get available models with real pricing (per million tokens)
+    ollama_models = get_ollama_models()
+    
     llm_providers = {
         "1": {
+            "name": "ollama",
+            "display": "Ollama (Local)", 
+            "models": ollama_models
+        },
+        "2": {
             "name": "anthropic",
             "display": "Anthropic (Claude)",
             "models": {
-                "1": "claude-3-5-sonnet-20241022",
-                "2": "claude-3-5-haiku-20241022", 
-                "3": "claude-3-opus-20240229",
-                "4": "claude-sonnet-4-20250514"
-            }
-        },
-        "2": {
-            "name": "openai", 
-            "display": "OpenAI (GPT)",
-            "models": {
-                "1": "gpt-4o",
-                "2": "gpt-4o-2024-08-06",
-                "3": "gpt-4-turbo-preview",
-                "4": "gpt-4",
-                "5": "gpt-3.5-turbo"
+                "1": {"name": "claude-3-5-sonnet-20241022", "input_price": 3.0, "output_price": 15.0, "description": "$3/$15 per MTok"},
+                "2": {"name": "claude-3-5-haiku-20241022", "input_price": 0.8, "output_price": 4.0, "description": "$0.8/$4 per MTok"},
+                "3": {"name": "claude-3-opus-20240229", "input_price": 15.0, "output_price": 75.0, "description": "$15/$75 per MTok"},
+                "4": {"name": "claude-3-sonnet-20240229", "input_price": 3.0, "output_price": 15.0, "description": "$3/$15 per MTok (Legacy)"},
+                "5": {"name": "claude-3-haiku-20240307", "input_price": 0.25, "output_price": 1.25, "description": "$0.25/$1.25 per MTok (Legacy)"}
             }
         },
         "3": {
-            "name": "ollama",
-            "display": "Ollama (Local)", 
+            "name": "openai", 
+            "display": "OpenAI (GPT)",
             "models": {
-                "1": "llama3.1:8b",
-                "2": "llama3.1:70b",
-                "3": "codellama:7b",
-                "4": "mistral:7b",
-                "5": "phi3:mini"
+                "1": {"name": "gpt-4o", "input_price": 5.0, "output_price": 15.0, "description": "$5/$15 per MTok"},
+                "2": {"name": "gpt-4o-mini", "input_price": 0.15, "output_price": 0.6, "description": "$0.15/$0.6 per MTok"},
+                "3": {"name": "o1-pro", "input_price": 150.0, "output_price": 600.0, "description": "$150/$600 per MTok"},
+                "4": {"name": "o3-mini", "input_price": 1.1, "output_price": 4.4, "description": "$1.1/$4.4 per MTok"},
+                "5": {"name": "gpt-4-turbo", "input_price": 10.0, "output_price": 30.0, "description": "$10/$30 per MTok"},
+                "6": {"name": "gpt-3.5-turbo", "input_price": 0.5, "output_price": 1.5, "description": "$0.5/$1.5 per MTok"}
             }
         },
         "4": {
             "name": "google",
             "display": "Google (Gemini)",
             "models": {
-                "1": "gemini-pro",
-                "2": "gemini-1.5-pro",
-                "3": "gemini-1.5-flash"
+                "1": {"name": "gemini-2.0-flash", "input_price": 0.1, "output_price": 0.4, "description": "$0.1/$0.4 per MTok"},
+                "2": {"name": "gemini-1.5-pro", "input_price": 1.25, "output_price": 5.0, "description": "$1.25/$5 per MTok"},
+                "3": {"name": "gemini-1.5-flash", "input_price": 0.075, "output_price": 0.3, "description": "$0.075/$0.3 per MTok"},
+                "4": {"name": "gemini-1.5-flash-8b", "input_price": 0.0375, "output_price": 0.15, "description": "$0.0375/$0.15 per MTok"}
             }
         },
         "5": {
             "name": "groq",
             "display": "Groq (Fast inference)",
             "models": {
-                "1": "llama-3.1-70b-versatile",
-                "2": "llama-3.1-8b-instant", 
-                "3": "mixtral-8x7b-32768",
-                "4": "gemma-7b-it"
+                "1": {"name": "llama-3.1-70b-versatile", "input_price": 0.59, "output_price": 0.79, "description": "$0.59/$0.79 per MTok"},
+                "2": {"name": "llama-3.1-8b-instant", "input_price": 0.05, "output_price": 0.08, "description": "$0.05/$0.08 per MTok"},
+                "3": {"name": "mixtral-8x7b-32768", "input_price": 0.24, "output_price": 0.24, "description": "$0.24/$0.24 per MTok"},
+                "4": {"name": "gemma-7b-it", "input_price": 0.07, "output_price": 0.07, "description": "$0.07/$0.07 per MTok"},
+                "5": {"name": "llama3-70b-8192", "input_price": 0.59, "output_price": 0.79, "description": "$0.59/$0.79 per MTok"}
             }
         }
     }
@@ -92,8 +226,11 @@ def main():
     
     print(f"✅ Selected Provider: {provider_display}")
     print("\nChoose Model:")
-    for key, model in provider_config["models"].items():
-        print(f"{key}. {model}")
+    for key, model_data in provider_config["models"].items():
+        # Calculate estimated cost for 100k tokens (typical session)
+        est_cost_100k = (50000 * model_data['input_price'] + 50000 * model_data['output_price']) / 1000000
+        cost_display = f"(~${est_cost_100k:.4f} per 100k tokens)" if est_cost_100k > 0 else ""
+        print(f"{key}. {model_data['name']} - {model_data['description']} {cost_display}")
     print("")
     
     try:
@@ -103,12 +240,40 @@ def main():
     except (EOFError, KeyboardInterrupt):
         model_choice = "1"
     
-    selected_model = provider_config["models"].get(model_choice, list(provider_config["models"].values())[0])
+    selected_model_data = provider_config["models"].get(model_choice, list(provider_config["models"].values())[0])
+    selected_model = selected_model_data["name"]
+    selected_input_price = selected_model_data["input_price"]
+    selected_output_price = selected_model_data["output_price"]
     
     os.environ['DEFAULT_LLM_PROVIDER'] = provider_name
     os.environ['DEFAULT_MODEL'] = selected_model
+    os.environ['MODEL_INPUT_PRICE'] = str(selected_input_price)
+    os.environ['MODEL_OUTPUT_PRICE'] = str(selected_output_price)
+    
+    # Verify provider-specific requirements
+    if provider_name == "ollama":
+        try:
+            result = subprocess.run(['ollama', 'ps'], capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                print("✅ Ollama service is running")
+            else:
+                print("⚠️ Warning: Ollama service may not be running. Start with: ollama serve")
+        except Exception:
+            print("⚠️ Warning: Could not verify Ollama status")
+    elif provider_name == "anthropic":
+        if not os.getenv('ANTHROPIC_API_KEY'):
+            print("⚠️ Warning: ANTHROPIC_API_KEY environment variable not set")
+            print("   Set it with: export ANTHROPIC_API_KEY=your_api_key")
+        else:
+            print("✅ Anthropic API key found")
+    
+    # Initialize token counter with selected model pricing
+    global token_counter
+    token_counter = TokenCounter()
     
     print(f"✅ Selected: {provider_display} - {selected_model}")
+    print(f"💰 Pricing: ${selected_input_price}/${selected_output_price} per MTok (input/output)")
+    print("📊 Token usage tracking enabled")
     print("")
     
     print("Choose execution mode:")
@@ -133,10 +298,10 @@ def main():
         if goal_args:
             goal = " ".join(goal_args)
             print(f"\n🧬 Running evolving crew builder with goal: {goal}")
-            asyncio.run(run_evolving_crew_builder(goal))
+            asyncio.run(run_evolving_crew_builder(goal, provider_name, selected_model))
         else:
             print(f"\n🧬 Running interactive evolving crew builder...")
-            asyncio.run(run_evolving_crew_builder())
+            asyncio.run(run_evolving_crew_builder(None, provider_name, selected_model))
             
     elif mode in ["2", "server", "mcp"]:
         # Start MCP server
@@ -184,6 +349,10 @@ def main():
         print("❌ Invalid choice. Using flow-based crew builder...")
         from evolving_crew_flow import run_flow_based_crew_builder
         run_flow_based_crew_builder()
+    
+    # Print session usage summary at the end
+    if token_counter.session_input_tokens > 0 or token_counter.session_output_tokens > 0:
+        token_counter.print_session_summary()
 
 async def run_evolution_demo():
     """Run autonomous agent evolution demonstration"""
@@ -258,16 +427,27 @@ def parse_agent1_config(agent1_result):
     import sys
     sys.exit(1)
 
-async def run_evolving_crew_builder(goal=None):
+async def run_evolving_crew_builder(goal=None, provider_name="ollama", selected_model="mistral:latest"):
     """Run the evolving crew builder with Agent 1 research and evolution"""
     print("🧬 EVOLVING CREW BUILDER WITH AGENT 1")
     print("=" * 60)
-    print("This enhanced version includes:")
-    print("• Agent 1 researches and designs crew")
-    print("• Hierarchical process with manager delegation")
-    print("• Crew built with evolution capabilities")
-    print("• Autonomous agent evolution during execution")
-    print("• Performance monitoring and adaptation")
+    
+    # Calculate dynamic stats
+    total_providers = 5  # Ollama, Anthropic, OpenAI, Google, Groq
+    
+    print("🚀 REVOLUTIONARY AI CREW SYSTEM:")
+    if provider_name == "ollama":
+        ollama_count = len(get_ollama_models())
+        print(f"• {ollama_count} Local Ollama models detected + {total_providers-1} cloud providers available")
+        print(f"• Zero-cost execution: $0.0/$0.0 per MTok (FREE!)")
+    else:
+        input_price = os.getenv('MODEL_INPUT_PRICE', '0')
+        output_price = os.getenv('MODEL_OUTPUT_PRICE', '0')
+        print(f"• {total_providers} LLM providers available (Ollama, Anthropic, OpenAI, Google, Groq)")
+        print(f"• Real-time token tracking: ${input_price}/${output_price} per MTok")
+    print(f"• Selected: {provider_name.title()} - {selected_model}")
+    print(f"• Agent 1 researches web + designs optimal crew architecture")
+    print(f"• Evolution engine: Agents adapt and improve during execution")
     print("")
     
     try:
@@ -350,30 +530,51 @@ async def run_evolving_crew_builder(goal=None):
         
         print(f"🔍 Agent 1 will research this goal and design the optimal evolving crew: {goal}")
         
-        # Create Agent 1 for research and design using selected LLM provider
-        from src.mcp_crewai.server import create_llm
-        llm = create_llm()
+        # Create Agent 1 for research and design using CrewAI's native LLM configuration
         web_search_tool = WebSearchTool()
+        
+        # Use CrewAI's LLM class for better compatibility
+        if provider_name == "ollama":
+            from crewai import LLM
+            crew_llm = LLM(
+                model=f"ollama/{selected_model}",
+                base_url="http://localhost:11434"
+            )
+            print(f"✅ Using CrewAI LLM wrapper for Ollama: {selected_model}")
+        elif provider_name == "anthropic":
+            from crewai import LLM
+            crew_llm = LLM(
+                model=f"anthropic/{selected_model}",
+                api_key=os.getenv('ANTHROPIC_API_KEY')
+            )
+            print(f"✅ Using CrewAI LLM wrapper for Anthropic: {selected_model}")
+        else:
+            # For other providers, use our create_llm function
+            from src.mcp_crewai.server import create_llm
+            crew_llm = create_llm()
         
         agent1 = Agent(
             role="Senior AI Crew Architecture Specialist",
-            goal="""Conduct comprehensive research and design a highly specialized, hierarchical crew 
-            configuration with precise role definitions, complementary skills, and clear task interfaces. 
+            goal="""Conduct comprehensive research and design a highly specialized crew configuration 
+            with precise role definitions, complementary skills, and clear task interfaces. Choose the optimal 
+            process type (sequential or hierarchical) based on the task complexity and coordination needs.
             Deliver a detailed JSON specification that enables autonomous evolution and optimal performance.""",
             backstory="""You are a world-class AI system architect with 15+ years of experience designing 
             multi-agent systems for Fortune 500 companies. You've published research on agent collaboration 
-            patterns, hierarchical team dynamics, and autonomous evolution frameworks. Your expertise includes:
+            patterns, team dynamics, and autonomous evolution frameworks. Your expertise includes:
             - Advanced agent role specialization and skill complementarity
-            - Hierarchical delegation patterns and management structures  
+            - Process optimization (sequential vs hierarchical coordination)
             - Evolutionary AI systems and adaptation mechanisms
             - Task decomposition and interface design for seamless handoffs
             - Quality standards and performance optimization for AI teams
             
+            You understand that SEQUENTIAL processes work best for linear workflows where tasks build on each other,
+            while HIERARCHICAL processes are optimal for complex coordination requiring management oversight.
+            
             You approach each project with scientific rigor, conducting thorough research before designing 
-            highly specialized teams where each agent has distinct expertise that creates productive tension 
-            and innovative solutions.""",
+            highly specialized teams where each agent has distinct expertise that creates productive solutions.""",
             tools=[web_search_tool],
-            llm=llm,
+            llm=crew_llm,
             verbose=True,
             allow_delegation=False
         )
@@ -394,15 +595,15 @@ async def run_evolving_crew_builder(goal=None):
             {{
                 "research_analysis": "your analysis of requirements",
                 "evolution_strategy": "how agents should evolve for this goal",
-                "process_type": "hierarchical",
-                "management_strategy": "how the crew should be managed hierarchically",
+                "process_type": "sequential|hierarchical (choose based on: sequential=linear workflow, hierarchical=complex coordination)",
+                "management_strategy": "how the crew should be managed (describe the coordination approach)",
                 "agents": [
                     {{
                         "role": "Specific Role",
                         "goal": "Detailed goal related to: {goal}",
-                        "backstory": "Backstory emphasizing adaptability, evolution, and hierarchical coordination",
+                        "backstory": "Backstory emphasizing adaptability and evolution",
                         "personality_type": "analytical|creative|collaborative|decisive",
-                        "management_level": "manager|worker"
+                        "management_level": "manager|worker (only needed if process_type is hierarchical)"
                     }}
                 ],
                 "tasks": [
@@ -413,12 +614,24 @@ async def run_evolving_crew_builder(goal=None):
                 ]
             }}
             """,
-            expected_output="Detailed evolving crew configuration JSON",
+            expected_output="MUST return valid JSON configuration ONLY. No explanation, just the JSON object starting with { and ending with }.",
             agent=agent1
         )
         
         # Create manager LLM for hierarchical process using selected provider
-        manager_llm = create_llm()
+        if provider_name == "ollama":
+            manager_llm = LLM(
+                model=f"ollama/{selected_model}",
+                base_url="http://localhost:11434"
+            )
+        elif provider_name == "anthropic":
+            manager_llm = LLM(
+                model=f"anthropic/{selected_model}",
+                api_key=os.getenv('ANTHROPIC_API_KEY')
+            )
+        else:
+            from src.mcp_crewai.server import create_llm
+            manager_llm = create_llm()
         
         # Execute Agent 1's research
         research_crew = Crew(
@@ -432,6 +645,11 @@ async def run_evolving_crew_builder(goal=None):
         print("🔍 AGENT 1 RESEARCHING AND DESIGNING EVOLVING CREW...")
         agent1_result = research_crew.kickoff()
         print("✅ AGENT 1 RESEARCH COMPLETED!")
+        
+        # Track token usage for Agent 1's research
+        input_text = f"{research_task.description}\n{agent1.backstory}\n{goal}"
+        output_text = str(agent1_result)
+        token_counter.add_usage(input_text, output_text, os.getenv('DEFAULT_MODEL', 'gpt-4'))
         
         # Parse configuration
         config = parse_agent1_config(str(agent1_result))
@@ -466,12 +684,14 @@ async def run_evolving_crew_builder(goal=None):
         await server._create_evolving_crew(crew_config)
         crew_id = crew_config["crew_name"]
         
-        # Execute with evolution using hierarchical process
-        print("⚡ EXECUTING EVOLVING CREW WITH HIERARCHICAL MANAGEMENT & AUTONOMOUS ADAPTATION...")
+        # Execute with evolution using Agent 1's chosen process type
+        chosen_process = config.get('process_type', 'sequential').lower()
+        process_display = "HIERARCHICAL MANAGEMENT" if chosen_process == "hierarchical" else "SEQUENTIAL WORKFLOW"
+        print(f"⚡ EXECUTING EVOLVING CREW WITH {process_display} & AUTONOMOUS ADAPTATION...")
         execution_context = {
             "user_goal": goal,
             "evolution_enabled": True,
-            "process_type": "hierarchical",
+            "process_type": chosen_process,
             "research_analysis": config.get('research_analysis', ''),
             "evolution_strategy": config.get('evolution_strategy', '')
         }
@@ -482,6 +702,12 @@ async def run_evolving_crew_builder(goal=None):
             "allow_evolution": True
         })
         
+        # Track token usage for crew execution (estimate based on goal and result)
+        if result:
+            crew_input_text = f"{goal}\n{config.get('research_analysis', '')}\n{str(execution_context)}"
+            crew_output_text = str(result[0].text) if result else ""
+            token_counter.add_usage(crew_input_text, crew_output_text, os.getenv('DEFAULT_MODEL', 'gpt-4'))
+        
         # Show results
         print("\n🎉 EVOLVING CREW EXECUTION COMPLETED!")
         print("=" * 80)
@@ -489,6 +715,7 @@ async def run_evolving_crew_builder(goal=None):
         # Extract and display the actual work product
         if result:
             try:
+                import json
                 result_data = json.loads(result[0].text)
                 
                 # Check if we have deliverable results
@@ -538,10 +765,10 @@ async def run_evolving_crew_builder(goal=None):
             actual_work_content = "No result returned from crew execution"
         
         # Get evolution summary
-        import json
         evolution_summary = await server._get_evolution_summary({})
         if evolution_summary:
             print("🧬 EVOLUTION SUMMARY:")
+            import json
             evolution_data = json.loads(evolution_summary[0].text)
             print(f"   Total Evolutions: {evolution_data.get('total_evolutions', 0)}")
             print(f"   Evolution Rate: {evolution_data.get('evolution_rate', 0):.2f}%")
@@ -549,15 +776,17 @@ async def run_evolving_crew_builder(goal=None):
         
         # Save results
         timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        os.makedirs("exported_results", exist_ok=True)
         filename = f"exported_results/evolving_crew_results_{timestamp_str}.md"
         
         with open(filename, 'w') as f:
+            import json
             f.write(f"# Evolving Crew Results\n\n")
             f.write(f"**Goal:** {goal}\n\n")
             f.write(f"**Agent 1 Analysis:** {config.get('research_analysis', 'N/A')}\n\n")
             f.write(f"**Evolution Strategy:** {config.get('evolution_strategy', 'N/A')}\n\n")
-            f.write(f"**Process Type:** Hierarchical with autonomous evolution\n\n")
-            f.write(f"**Management Strategy:** {config.get('management_strategy', 'Hierarchical coordination')}\n\n")
+            f.write(f"**Process Type:** {chosen_process.title()} with autonomous evolution\n\n")
+            f.write(f"**Management Strategy:** {config.get('management_strategy', 'Agent coordination')}\n\n")
             f.write(f"**Crew Configuration:**\n```json\n{json.dumps(crew_config, indent=2)}\n```\n\n")
             if evolution_summary:
                 f.write(f"**Evolution Summary:**\n```json\n{evolution_summary[0].text}\n```\n\n")

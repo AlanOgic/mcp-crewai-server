@@ -1,0 +1,26 @@
+# Minimal Requirements for MCP CrewAI Server
+# Core functionality only
+
+# MCP and CrewAI
+mcp>=1.9.4
+crewai>=0.130.0
+
+# LLM Providers (choose what you need)
+anthropic>=0.54.0          # For Claude models
+openai>=1.86.0             # For GPT models
+langchain-ollama>=0.3.3    # For local Ollama models
+groq>=0.28.0               # For Groq models
+tiktoken>=0.9.0            # For token counting
+
+# Web Framework
+fastapi>=0.115.9
+uvicorn>=0.34.3
+httpx>=0.28.1
+
+# Core Dependencies
+pydantic>=2.11.7
+pydantic-settings>=2.9.1
+python-dotenv>=1.1.0
+aiosqlite>=0.21.0
+rich>=13.9.4
+asyncio-mqtt>=0.16.2

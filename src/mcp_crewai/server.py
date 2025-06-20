@@ -55,9 +55,13 @@ def create_llm():
         safe_stderr = io.StringIO()
         
         with contextlib.redirect_stdout(safe_stdout), contextlib.redirect_stderr(safe_stderr):
-            llm_config = config.get_llm_config()
+            # Reload config to pick up environment variables set by main.py
+            from .config import reload_config
+            current_config = reload_config()
+            llm_config = current_config.get_llm_config()
             provider = llm_config.get("provider", "openai").lower()
             model = llm_config.get("model", "gpt-4-turbo-preview")
+            
             api_key = llm_config.get("api_key")
             base_url = llm_config.get("base_url")  # For Ollama and custom endpoints
             
@@ -94,6 +98,7 @@ def create_llm():
                 from langchain_ollama import ChatOllama
                 ollama_base_url = base_url or "http://localhost:11434"
                 logger.info(f"🦙 Creating Ollama LLM: {model} at {ollama_base_url}")
+                print(f"✅ Using Ollama model: {model} (Local - No API costs)")
                 return ChatOllama(
                     model=model,
                     base_url=ollama_base_url,
@@ -155,50 +160,70 @@ def create_llm():
     except Exception as e:
         logger.error(f"❌ Failed to create {provider} LLM: {e}")
         
-        # Smart fallback: Try to find any available provider
-        logger.warning("🔄 Attempting smart fallback to available providers...")
+        # Smart fallback: Try the user's selected provider with a different model if the specific model failed
+        logger.warning(f"🔄 Attempting fallback for {provider} provider with alternative models...")
+        
+        # If Ollama failed, try with a default model
+        if provider == "ollama":
+            try:
+                from langchain_ollama import ChatOllama
+                fallback_model = "llama3.2"  # Common Ollama model
+                logger.info(f"🦙 Fallback: Using Ollama with {fallback_model} model")
+                return ChatOllama(
+                    model=fallback_model,
+                    base_url=base_url or "http://localhost:11434",
+                    temperature=0.1
+                )
+            except Exception:
+                logger.warning("🦙 Ollama fallback also failed")
+        
+        # If user's provider failed completely, try other providers based on API key availability
+        logger.warning("🔄 User's selected provider failed, trying available alternatives...")
         
         # Try Ollama first (no API key needed)
-        try:
-            from langchain_ollama import ChatOllama
-            logger.info("🦙 Fallback: Using Ollama with llama3.2 model")
-            return ChatOllama(
-                model="llama3.2",
-                base_url="http://localhost:11434",
-                temperature=0.1
-            )
-        except Exception:
-            pass
-        
-        # Try OpenAI if key available
-        try:
-            openai_key = os.getenv("OPENAI_API_KEY")
-            if openai_key:
-                from langchain_openai import ChatOpenAI
-                logger.info("🔴 Fallback: Using OpenAI GPT-4")
-                return ChatOpenAI(
-                    model="gpt-4-turbo-preview",
-                    openai_api_key=openai_key,
-                    temperature=0.1,
-                    max_tokens=4096
+        if provider != "ollama":
+            try:
+                from langchain_ollama import ChatOllama
+                logger.info("🦙 Alternative fallback: Using Ollama")
+                return ChatOllama(
+                    model="llama3.2",
+                    base_url="http://localhost:11434",
+                    temperature=0.1
                 )
-        except Exception:
-            pass
+            except Exception:
+                pass
         
-        # Try Anthropic if key available
-        try:
-            anthropic_key = os.getenv("ANTHROPIC_API_KEY")
-            if anthropic_key:
-                from langchain_anthropic import ChatAnthropic
-                logger.info("🤖 Fallback: Using Anthropic Claude")
-                return ChatAnthropic(
-                    model="claude-3-5-sonnet-20241022",
-                    anthropic_api_key=anthropic_key,
-                    temperature=0.1,
-                    max_tokens=4096
-                )
-        except Exception:
-            pass
+        # Try OpenAI if key available and wasn't the original choice
+        if provider != "openai":
+            try:
+                openai_key = os.getenv("OPENAI_API_KEY")
+                if openai_key:
+                    from langchain_openai import ChatOpenAI
+                    logger.info("🔴 Alternative fallback: Using OpenAI GPT-4")
+                    return ChatOpenAI(
+                        model="gpt-4-turbo-preview",
+                        openai_api_key=openai_key,
+                        temperature=0.1,
+                        max_tokens=4096
+                    )
+            except Exception:
+                pass
+        
+        # Try Anthropic if key available and wasn't the original choice
+        if provider != "anthropic":
+            try:
+                anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+                if anthropic_key:
+                    from langchain_anthropic import ChatAnthropic
+                    logger.info("🤖 Alternative fallback: Using Anthropic Claude")
+                    return ChatAnthropic(
+                        model="claude-3-5-sonnet-20241022",
+                        anthropic_api_key=anthropic_key,
+                        temperature=0.1,
+                        max_tokens=4096
+                    )
+            except Exception:
+                pass
         
         # Ultimate failure
         raise Exception(f"Could not create any LLM instance. Original error: {e}")
